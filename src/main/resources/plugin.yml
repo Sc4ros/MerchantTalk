@@ -1,0 +1,23 @@
+name: MerchantTalk
+version: '${version}'
+main: fr.merchanttalk.MerchantTalkPlugin
+api-version: '26.2'
+description: Des PNJ marchands qui parlent et qui sont la seule porte d'entrée vers EconomyShopGUI.
+authors: [Sc4ros]
+depend: [FancyNpcs]
+softdepend: [EconomyShopGUI, EconomyShopGUI-Premium]
+
+commands:
+  merchanttalk:
+    description: Gestion des PNJ marchands de MerchantTalk
+    usage: /<command> help
+    aliases: [mt]
+    permission: merchanttalk.admin
+
+permissions:
+  merchanttalk.admin:
+    description: Accès aux commandes /merchanttalk
+    default: op
+  merchanttalk.bypass:
+    description: Peut utiliser les commandes d'EconomyShopGUI directement et ignore le resource pack obligatoire
+    default: op
