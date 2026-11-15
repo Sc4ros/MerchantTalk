@@ -106,7 +106,9 @@ ai:
   provider: groq
   # Ta clé API (ne la partage jamais). Elle n'est jamais affichée sur le site.
   api-key: ""
-  # Modèle. Vide = modèle par défaut : groq → llama-3.3-70b-versatile,
+  # Modèles Groq actuels : openai/gpt-oss-20b (rapide), openai/gpt-oss-120b (plus malin).
+  # Liste : https://console.groq.com/docs/models
+  # Modèle. Vide = modèle par défaut : groq → openai/gpt-oss-20b,
   # gemini → gemini-2.5-flash, openai → gpt-4o-mini.
   model: ""
   # Uniquement pour provider: openai. Ex : https://api.mistral.ai/v1 ou https://openrouter.ai/api/v1

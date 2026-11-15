@@ -83,7 +83,7 @@ public final class AiService {
         return switch (provider()) {
             case "gemini" -> "gemini-2.5-flash";
             case "openai" -> "gpt-4o-mini";
-            default -> "llama-3.3-70b-versatile";
+            default -> "openai/gpt-oss-20b";
         };
     }
 
@@ -306,7 +306,7 @@ public final class AiService {
     }
 
     private String clean(String reply, Merchant m) {
-        String s = MARKDOWN.matcher(reply).replaceAll("").replaceAll("\\s+", " ").trim();
+        String s = MARKDOWN.matcher(reply.replaceAll("(?s)<think>.*?</think>", "")).replaceAll("").replaceAll("\\s+", " ").trim();
         // Certains modèles commencent par « Nom : ».
         for (String n : callNames(m)) {
             var prefix = Pattern.compile("^" + Pattern.quote(n) + "\\s*:\\s*", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(s);
@@ -360,12 +360,15 @@ public final class AiService {
                 body.add("contents", contents);
                 JsonObject gen = new JsonObject();
                 gen.addProperty("temperature", temperature);
-                gen.addProperty("maxOutputTokens", maxTokens);
                 if (model.startsWith("gemini-2.5-flash")) {
                     JsonObject thinking = new JsonObject();
                     thinking.addProperty("thinkingBudget", 0); // réponse rapide, sans « réflexion »
                     gen.add("thinkingConfig", thinking);
+                } else {
+                    // Les autres modèles Gemini réfléchissent avant de répondre : on laisse de la marge.
+                    maxTokens = Math.max(maxTokens, 1500);
                 }
+                gen.addProperty("maxOutputTokens", maxTokens);
                 body.add("generationConfig", gen);
                 String url = "https://generativelanguage.googleapis.com/v1beta/models/"
                         + URLEncoder.encode(model, StandardCharsets.UTF_8) + ":generateContent";
@@ -382,6 +385,25 @@ public final class AiService {
                 JsonObject body = new JsonObject();
                 body.addProperty("model", model);
                 body.addProperty("temperature", temperature);
+                String lower = model.toLowerCase(Locale.ROOT);
+                boolean reasoning = lower.contains("gpt-oss") || lower.contains("qwen3") || lower.contains("minimax")
+                        || lower.contains("muse-spark") || lower.matches(".*\bo[1-9].*") || lower.startsWith("gpt-5");
+                if (reasoning) {
+                    // Les modèles qui « réfléchissent » consomment des tokens avant de répondre :
+                    // on limite la réflexion et on laisse de la marge pour que la réponse ne soit pas vide.
+                    maxTokens = Math.max(maxTokens, 1500);
+                    if (provider().equals("groq")) {
+                        if (lower.contains("gpt-oss")) {
+                            body.addProperty("reasoning_effort", "low");
+                            body.addProperty("include_reasoning", false);
+                        } else if (lower.contains("qwen3")) {
+                            body.addProperty("reasoning_effort", "none");
+                            body.addProperty("reasoning_format", "hidden");
+                        } else {
+                            body.addProperty("reasoning_format", "hidden");
+                        }
+                    }
+                }
                 body.addProperty("max_tokens", maxTokens);
                 JsonArray msgs = new JsonArray();
                 msgs.add(message("system", system));
