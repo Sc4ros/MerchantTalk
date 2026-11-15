@@ -40,7 +40,9 @@ public final class ShopService {
         merchant.stats().lastActivity = System.currentTimeMillis();
         plugin.store().markDirty();
         String section = merchant.section == null ? "" : merchant.section.trim();
-        String template = section.isEmpty()
+        String template = merchant.isSellMenu()
+                ? plugin.getConfig().getString("shop.open-command-sellgui", "sellgui {player}")
+                : section.isEmpty()
                 ? plugin.getConfig().getString("shop.open-command-main", "shop {player}")
                 : plugin.getConfig().getString("shop.open-command-section", "shop {section} {player}");
         String command = template.replace("{player}", player.getName()).replace("{section}", section);

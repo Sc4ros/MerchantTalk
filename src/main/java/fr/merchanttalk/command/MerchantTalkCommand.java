@@ -79,7 +79,7 @@ public final class MerchantTalkCommand implements CommandExecutor, TabCompleter 
         for (Merchant m : merchants) {
             String where = m.location == null ? "<red>pas placé" :
                     "<gray>" + m.location.world + " " + (int) m.location.x + " " + (int) m.location.y + " " + (int) m.location.z;
-            String section = m.section == null || m.section.isBlank() ? "menu principal" : m.section;
+            String section = m.isSellMenu() ? "menu de vente" : m.section == null || m.section.isBlank() ? "menu principal" : m.section;
             s.sendMessage(MM.deserialize("<dark_gray>- <yellow>" + m.id + "</yellow> ")
                     .append(MM.deserialize(m.displayName == null ? "" : m.displayName))
                     .append(MM.deserialize(" <dark_gray>| <gray>" + escape(section) + " <dark_gray>| " + where)));

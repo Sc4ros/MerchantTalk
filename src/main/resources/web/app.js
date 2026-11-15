@@ -373,6 +373,14 @@ function renderEditor() {
   const sectionList = el("datalist", { id: "sections-list" }, ...state.sections.map((s) => el("option", { value: s })));
   const sectionInput = el("input", { type: "text", value: m.section || "", list: "sections-list", placeholder: "Vide = menu principal du shop" });
   sectionInput.addEventListener("input", () => { m.section = sectionInput.value; markDirty(); });
+  const modeSelect = el("select", {},
+    el("option", { value: "SHOP", text: "🛒 Le shop (une section)" }),
+    el("option", { value: "SELLGUI", text: "💰 Le menu de vente (/sellgui)" }));
+  modeSelect.value = m.mode === "SELLGUI" ? "SELLGUI" : "SHOP";
+  const sectionField = field("Section du shop EconomyShopGUI", el("span", {}, sectionInput, sectionList), state.sections.length ? "Choisis dans la liste ou laisse vide" : null);
+  const syncMode = () => { sectionField.style.display = modeSelect.value === "SELLGUI" ? "none" : ""; };
+  modeSelect.addEventListener("change", () => { m.mode = modeSelect.value; syncMode(); markDirty(); });
+  syncMode();
 
   const permission = el("input", { type: "text", value: m.permission || "", maxlength: 100, placeholder: "Vide = tout le monde (ex : rang.vip)" });
   permission.addEventListener("input", () => { m.permission = permission.value.replace(/\s/g, ""); markDirty(); });
@@ -391,7 +399,8 @@ function renderEditor() {
     el("h2", { text: "Réglages" }),
     el("div", { class: "grid-2" },
       field("Nom affiché", nameInput, "Couleurs MiniMessage : <gold>, <bold>, <#ff8800>, <gradient:gold:red>…"),
-      field("Section du shop EconomyShopGUI", el("span", {}, sectionInput, sectionList), state.sections.length ? "Choisis dans la liste ou laisse vide" : null),
+      field("Ce que le marchand ouvre", modeSelect, "Menu de vente : le joueur dépose tous ses objets, ils sont vendus à la fermeture"),
+      sectionField,
       field("Permission requise", permission, "Les joueurs sans cette permission entendent la réplique « sans permission »"),
       field("Distance de salut (blocs, 0 = jamais)", radius),
       field("Délai avant de resaluer le même joueur (secondes)", cooldown)),
@@ -587,7 +596,7 @@ async function saveMerchant() {
   }
   try {
     await api("PUT", "merchants/" + encodeURIComponent(m.id), {
-      displayName: m.displayName, section: m.section, lookAtPlayer: m.lookAtPlayer, slimSkin: m.slimSkin,
+      displayName: m.displayName, section: m.section, mode: m.mode || "SHOP", lookAtPlayer: m.lookAtPlayer, slimSkin: m.slimSkin,
       talkParticles: m.talkParticles !== false, permission: m.permission || "",
       greetRadius: m.greetRadius, greetCooldownSeconds: m.greetCooldownSeconds, lines,
     });

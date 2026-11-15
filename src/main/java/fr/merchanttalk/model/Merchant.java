@@ -12,6 +12,12 @@ public final class Merchant {
     public String displayName = "<gold>Marchand";
     /** Section EconomyShopGUI ouverte. Vide = menu principal. */
     public String section = "";
+    /** Ce que le marchand ouvre : "SHOP" (le shop / une section) ou "SELLGUI" (le menu de vente /sellgui). */
+    public String mode = "SHOP";
+
+    public boolean isSellMenu() {
+        return "SELLGUI".equalsIgnoreCase(mode);
+    }
     /** Nom du fichier de skin dans plugins/MerchantTalk/skins, ou null pour le skin par défaut. */
     public String skinFile;
     public boolean slimSkin;

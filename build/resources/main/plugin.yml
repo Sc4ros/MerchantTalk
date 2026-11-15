@@ -1,5 +1,5 @@
 name: MerchantTalk
-version: '1.2.1'
+version: '1.3.0'
 main: fr.merchanttalk.MerchantTalkPlugin
 api-version: '26.2'
 description: Des PNJ marchands qui parlent et qui sont la seule porte d'entrée vers EconomyShopGUI.

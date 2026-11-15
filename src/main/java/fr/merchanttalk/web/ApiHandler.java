@@ -339,6 +339,7 @@ final class ApiHandler {
             Merchant m = requireMerchant(id);
             if (body.has("displayName")) m.displayName = limit(str(body, "displayName"), 200);
             if (body.has("section")) m.section = limit(str(body, "section").trim(), 100);
+            if (body.has("mode")) m.mode = "SELLGUI".equalsIgnoreCase(str(body, "mode")) ? "SELLGUI" : "SHOP";
             if (body.has("slimSkin")) m.slimSkin = body.get("slimSkin").getAsBoolean();
             if (body.has("lookAtPlayer")) m.lookAtPlayer = body.get("lookAtPlayer").getAsBoolean();
             if (body.has("talkParticles")) m.talkParticles = body.get("talkParticles").getAsBoolean();

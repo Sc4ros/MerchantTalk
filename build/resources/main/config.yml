@@ -39,6 +39,9 @@ shop:
   # {player} = pseudo du joueur, {section} = section EconomyShopGUI du PNJ.
   open-command-section: "shop {section} {player}"
   open-command-main: "shop {player}"
+  # Commande des marchands en mode « Menu de vente » : le joueur y dépose tous ses objets,
+  # ils sont vendus à la fermeture.
+  open-command-sellgui: "sellgui {player}"
   # Bloque les commandes d'EconomyShopGUI pour les joueurs (sauf permission merchanttalk.bypass).
   block-commands: true
   # Bloque aussi automatiquement TOUTES les commandes déclarées par EconomyShopGUI.
