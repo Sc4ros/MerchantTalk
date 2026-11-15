@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MerchantTalk</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <!-- Connexion -->
   <section id="login" class="login hidden">
     <form id="login-form" class="card login-card">
-      <div class="brand"><span class="logo">💬</span> MerchantTalk</div>
+      <div class="brand"><img class="logo" src="logo.svg" alt=""> MerchantTalk</div>
       <p class="muted">Entre le mot de passe de l'interface (dans <code>plugins/MerchantTalk/config.yml</code>).</p>
       <input id="login-password" type="password" placeholder="Mot de passe" autocomplete="current-password" required>
       <button class="btn primary" type="submit">Se connecter</button>
@@ -21,7 +22,7 @@
   <!-- Application -->
   <section id="app" class="hidden">
     <header class="topbar">
-      <div class="brand"><span class="logo">💬</span> MerchantTalk</div>
+      <div class="brand"><img class="logo" src="logo.svg" alt=""> MerchantTalk</div>
       <nav class="tabs">
         <button class="tab active" data-tab="merchants">Marchands</button>
         <button class="tab" data-tab="voices">Voix</button>

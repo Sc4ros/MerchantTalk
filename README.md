@@ -1,4 +1,8 @@
-# MerchantTalk
+<p align="center">
+  <img src="assets/logo.svg" width="160" alt="MerchantTalk">
+</p>
+
+<h1 align="center">MerchantTalk</h1>
 
 **Des PNJ marchands qui parlent, et qui sont la seule porte d'entrée vers le shop [EconomyShopGUI](https://www.spigotmc.org/resources/economyshopgui.69927/).**
 
