@@ -93,6 +93,53 @@ dialogue:
     # Type de particule Bukkit sans données : NOTE, HEART, HAPPY_VILLAGER, ENCHANT...
     type: NOTE
 
+ai:
+  # Conversation libre avec les marchands grâce à une IA. Désactivé par défaut.
+  # Chaque marchand s'active et reçoit sa personnalité sur le site (carte « Conversation IA »).
+  # En jeu : près du marchand, le joueur écrit dans le chat en l'appelant (« @Bjorn salut ! »
+  # ou « Bjorn, tu vends quoi ? ») et le marchand répond dans le chat.
+  # ⚠ Les messages des joueurs qui parlent aux marchands sont envoyés au fournisseur d'IA choisi.
+  enabled: false
+  # groq    = https://console.groq.com/keys (gratuit, très rapide)
+  # gemini  = Google AI Studio : https://aistudio.google.com/apikey (gratuit avec limites)
+  # openai  = toute API compatible OpenAI (OpenAI, Mistral, OpenRouter...) : renseigne base-url
+  provider: groq
+  # Ta clé API (ne la partage jamais). Elle n'est jamais affichée sur le site.
+  api-key: ""
+  # Modèle. Vide = modèle par défaut : groq → llama-3.3-70b-versatile,
+  # gemini → gemini-2.5-flash, openai → gpt-4o-mini.
+  model: ""
+  # Uniquement pour provider: openai. Ex : https://api.mistral.ai/v1 ou https://openrouter.ai/api/v1
+  base-url: ""
+  # Distance max (blocs) entre le joueur et le marchand pour lui parler.
+  talk-radius: 8
+  # true  = il faut appeler le marchand par son nom (ou un surnom) pour qu'il réponde.
+  # false = tout message écrit près d'un marchand IA lui est adressé (le plus proche).
+  require-mention: true
+  # Après une réponse, le joueur peut continuer à lui parler sans le renommer pendant X secondes.
+  follow-up-seconds: 40
+  # Qui voit la réponse : nearby = tous les joueurs proches du marchand, player = seulement celui qui parle.
+  reply-to: nearby
+  # Langue des réponses.
+  language: français
+  # Longueur max d'une réponse (caractères).
+  max-reply-chars: 220
+  max-tokens: 200
+  # 0 = toujours la même réponse, 1+ = plus créatif.
+  temperature: 0.8
+  # Nombre de messages précédents dont le marchand se souvient (par joueur).
+  history: 8
+  # Délai minimum entre deux questions d'un même joueur (secondes).
+  cooldown-seconds: 3
+  # Limite pour tout le serveur, pour protéger ton quota (0 = illimité).
+  max-requests-per-minute: 30
+  # Règles ajoutées à toutes les personnalités (ex : "Ne parle jamais de politique.").
+  extra-rules: ""
+  # Affiché au-dessus de la barre d'action pendant que le marchand réfléchit (vide = rien).
+  thinking-message: "<gray><i><npc> <gray><i>réfléchit…"
+  # Si l'IA ne répond pas (clé invalide, quota dépassé...). Vide = rien.
+  error-message: "<gray><i><npc> <gray><i>ne semble pas t'avoir entendu."
+
 messages:
   prefix: "<gold>[MerchantTalk]</gold> "
   command-blocked: "<red>Le shop n'est accessible qu'auprès d'un marchand !"

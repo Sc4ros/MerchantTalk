@@ -431,6 +431,8 @@ function renderEditor() {
   skinCard.addEventListener("drop", (e) => { e.preventDefault(); skinCard.classList.remove("over"); uploadSkin(e.dataTransfer.files[0], slim.checked); });
   content.append(skinCard);
 
+  content.append(renderAiCard(m));
+
   // Dialogues
   const dialogues = el("div", { class: "card" },
     el("div", { class: "row-between wrap" },
@@ -598,6 +600,7 @@ async function saveMerchant() {
     await api("PUT", "merchants/" + encodeURIComponent(m.id), {
       displayName: m.displayName, section: m.section, mode: m.mode || "SHOP", lookAtPlayer: m.lookAtPlayer, slimSkin: m.slimSkin,
       talkParticles: m.talkParticles !== false, permission: m.permission || "",
+      aiEnabled: !!m.aiEnabled, aiPersonality: m.aiPersonality || "", aiNames: m.aiNames || "",
       greetRadius: m.greetRadius, greetCooldownSeconds: m.greetCooldownSeconds, lines,
     });
     dirty = false;
@@ -864,3 +867,88 @@ $("#record-btn").addEventListener("click", async () => {
   if (!token) return showLogin();
   try { await start(); } catch { showLogin(); }
 })();
+
+// ---------------------------------------------------------------- IA (conversation libre)
+
+const aiChats = {}; // historique de la discussion de test, par marchand
+
+function renderAiCard(m) {
+  const ai = state.ai || {};
+  const toggle = el("input", { type: "checkbox", checked: !!m.aiEnabled });
+  const names = el("input", { type: "text", value: m.aiNames || "", maxlength: 200, placeholder: "ex : Bjorn, forgeron" });
+  const personality = el("textarea", { rows: 6, maxlength: 4000, class: "ai-personality",
+    placeholder: "ex : Tu es Bjorn, un vieux forgeron nain bourru mais au grand cœur. Tu parles avec un accent du nord, tu râles souvent sur le prix du charbon et tu adores raconter tes aventures dans les mines. Tu tutoies tout le monde." });
+  personality.value = m.aiPersonality || "";
+  toggle.addEventListener("change", () => { m.aiEnabled = toggle.checked; markDirty(); });
+  names.addEventListener("input", () => { m.aiNames = names.value; markDirty(); });
+  personality.addEventListener("input", () => { m.aiPersonality = personality.value; markDirty(); });
+
+  let status;
+  if (!ai.enabled) status = el("div", { class: "notice", text: "L'IA est désactivée sur le serveur. Pour l'activer : dans plugins/MerchantTalk/config.yml, mets ai.enabled: true et ta clé dans ai.api-key, puis /mt reload." });
+  else if (!ai.hasKey) status = el("div", { class: "notice", text: "L'IA est activée mais aucune clé API n'est renseignée (ai.api-key dans config.yml), puis /mt reload." });
+  else status = el("p", { class: "muted", style: "margin:0" }, `✅ IA connectée : ${ai.provider === "gemini" ? "Google Gemini" : ai.provider === "groq" ? "Groq" : "API compatible OpenAI"} (${ai.model}).`);
+
+  const callNames = () => {
+    const list = [stripTags(m.displayName || m.id), ...(m.aiNames || "").split(",").map((s) => s.trim())].filter(Boolean);
+    return list.length ? list.map((n) => "@" + n).join(", ") : "@" + m.id;
+  };
+  const howto = el("p", { class: "muted small-text" });
+  const updateHowto = () => {
+    howto.textContent = `En jeu, à moins de ${ai.radius ?? 8} blocs du marchand, le joueur écrit dans le chat en l'appelant (${callNames()}, avec ou sans @). `
+      + "Ensuite il peut continuer la discussion sans le renommer pendant quelques secondes. La réponse s'affiche dans le chat (texte uniquement, pas de voix).";
+  };
+  updateHowto();
+  names.addEventListener("input", updateHowto);
+
+  // Discussion de test
+  const chat = aiChats[m.id] || (aiChats[m.id] = []);
+  const log = el("div", { class: "ai-log" });
+  const drawLog = () => {
+    log.replaceChildren(...chat.map((c) => c.role === "user"
+      ? el("div", { class: "ai-msg user", text: "Toi : " + c.text })
+      : (() => { const d = el("div", { class: "ai-msg npc line-preview" }); d.innerHTML = c.html || ""; if (!c.html) d.textContent = c.text; return d; })()));
+    log.classList.toggle("hidden", chat.length === 0);
+    log.scrollTop = log.scrollHeight;
+  };
+  drawLog();
+  const input = el("input", { type: "text", maxlength: 300, placeholder: "Écris quelque chose au marchand…" });
+  const send = el("button", { class: "btn", disabled: !ai.hasKey }, "Envoyer");
+  const reset = el("button", { class: "btn ghost small", title: "Oublier la discussion de test" }, "Effacer");
+  const doSend = async () => {
+    const message = input.value.trim();
+    if (!message) return;
+    if (dirty) toast("Astuce : enregistre d'abord pour tester la nouvelle personnalité.");
+    send.disabled = true;
+    input.value = "";
+    const history = chat.map((c) => ({ role: c.role, text: c.text }));
+    chat.push({ role: "user", text: message });
+    drawLog();
+    try {
+      const res = await api("POST", "merchants/" + encodeURIComponent(m.id) + "/ai-test", { message, history });
+      chat.push({ role: "assistant", text: res.reply, html: res.html });
+    } catch (e) {
+      chat.pop();
+      input.value = message;
+      toast(e.message, true);
+    }
+    send.disabled = false;
+    drawLog();
+    input.focus();
+  };
+  send.addEventListener("click", doSend);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doSend(); } });
+  reset.addEventListener("click", () => { chat.length = 0; drawLog(); });
+
+  return el("div", { class: "card" },
+    el("h2", { text: "🤖 Conversation IA" }),
+    status,
+    el("label", { class: "check", style: "margin-top:10px" }, toggle, "Les joueurs peuvent discuter librement avec ce marchand"),
+    el("div", { class: "grid-2" },
+      field("Surnoms pour l'appeler (séparés par des virgules)", names, "Son nom affiché marche déjà tout seul"),
+      el("div")),
+    field("Personnalité", personality, "Qui il est, son caractère, sa façon de parler, son histoire. Plus c'est détaillé, mieux il joue son rôle."),
+    howto,
+    el("h3", { text: "Tester la discussion", style: "margin:14px 0 6px" }),
+    log,
+    el("div", { class: "ai-input" }, input, send, reset));
+}
