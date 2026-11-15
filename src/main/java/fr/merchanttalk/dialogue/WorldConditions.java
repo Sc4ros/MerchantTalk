@@ -60,15 +60,22 @@ public final class WorldConditions {
     public boolean timeMatches(String time, World world) {
         if (time == null || time.equals("ANY")) return true;
         if (!TIMES.containsKey(time)) return true;
-        String[] parts = range(time).replace(" ", "").split("-");
-        if (parts.length != 2) return true;
+        Boolean in = inRange(range(time), world);
+        return in == null || in;
+    }
+
+    /** L'heure du jeu est-elle dans la plage "début-fin" (ex. "19-6") ? null si la plage est invalide. */
+    public static Boolean inRange(String range, World world) {
+        if (range == null) return null;
+        String[] parts = range.replace(" ", "").split("-");
+        if (parts.length != 2) return null;
         try {
             double start = Double.parseDouble(parts[0].replace("h", "").replace(",", "."));
             double end = Double.parseDouble(parts[1].replace("h", "").replace(",", "."));
             double h = hour(world);
             return start <= end ? h >= start && h < end : h >= start || h < end;
         } catch (NumberFormatException e) {
-            return true;
+            return null;
         }
     }
 

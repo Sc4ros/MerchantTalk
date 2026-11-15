@@ -17,6 +17,12 @@ Plugin Paper 26.2 · FancyNpcs · EconomyShopGUI (gratuit ou Premium)
 - **Répliques selon l'heure et la météo du jeu** : chaque réplique peut être réservée au matin, au jour, au soir ou à la nuit, et/ou au beau temps, à la pluie ou à l'orage. La nuit, le marchand dit en priorité ses répliques « Nuit ». Les plages horaires se règlent dans `config.yml`.
 - **Menu de vente** : un marchand peut ouvrir le `/sellgui` d'EconomyShopGUI au lieu d'une section. Le joueur y dépose tous ses objets d'un coup.
 - **Conversation IA (optionnelle)** : branche une clé **Groq**, **Google Gemini** ou n'importe quelle API compatible OpenAI. Près du marchand, le joueur l'appelle dans le chat (« @Bjorn salut ! ») et il répond avec la personnalité écrite sur le site. Il se souvient de la discussion, et on peut tester la conversation directement depuis le site.
+  - L'IA connaît **les vrais objets et prix** de sa boutique (promo comprise) : « Combien le diamant ? » → la bonne réponse.
+- **Clients fidèles** : chaque marchand se souvient des joueurs (visites, achats, ventes). Les habitués ont leurs propres répliques, les phrases peuvent utiliser `{visits}`, `{spent}`, `{earned}`, et le site affiche les meilleurs clients.
+- **Promotions (optionnel)** : réduction sur les achats et/ou bonus sur les ventes, tous les jours ou certains jours. Le marchand l'annonce aux joueurs qui passent.
+- **Horaires d'ouverture (optionnel)** : en dehors de ses heures, le marchand dort, disparaît ou refuse de vendre.
+- **Animations (optionnel)** : il s'incline pour saluer, prend l'objet acheté en main, des pièces volent.
+- **Marchand ambulant (optionnel)** : il voyage entre plusieurs emplacements et l'annonce à tout le serveur.
 - **Marchands réservés** : une permission par marchand (ex. `rang.vip`). Les autres joueurs se font gentiment refuser.
 - **Notes de musique** au-dessus du PNJ tant qu'il parle (désactivable).
 - **Statistiques** par marchand : ouvertures, achats, ventes, argent dépensé et gagné, refus faute d'argent.
@@ -72,6 +78,10 @@ Dans les textes, `{player}` est remplacé par le pseudo du joueur. Les couleurs 
 | `/mt sendpack [joueur]` | Renvoie le resource pack |
 | `/mt stats` | Statistiques des marchands |
 | `/mt blocked` | Commandes du shop bloquées |
+| `/mt addspot <id> [nom]` | Ajoute ta position à la tournée d'un marchand ambulant |
+| `/mt spots <id>` | Liste les emplacements de la tournée |
+| `/mt delspot <id> <numéro>` | Retire un emplacement |
+| `/mt nextspot <id>` | Envoie le marchand à l'emplacement suivant |
 | `/mt reload` | Recharge config et données |
 
 La permission `merchanttalk.bypass` (OP par défaut) permet d'utiliser `/shop` directement et dispense du resource pack obligatoire.

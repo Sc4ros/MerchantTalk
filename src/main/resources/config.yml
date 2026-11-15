@@ -135,6 +135,11 @@ ai:
   cooldown-seconds: 3
   # Limite pour tout le serveur, pour protéger ton quota (0 = illimité).
   max-requests-per-minute: 30
+  # true = le marchand connaît les objets et les vrais prix de sa boutique (lus dans EconomyShopGUI)
+  # et peut répondre à « combien le diamant ? ».
+  share-prices: true
+  # Nombre maximum d'objets envoyés à l'IA (au-delà, la liste est coupée).
+  max-catalog-items: 150
   # Règles ajoutées à toutes les personnalités (ex : "Ne parle jamais de politique.").
   extra-rules: ""
   # Affiché au-dessus de la barre d'action pendant que le marchand réfléchit (vide = rien).
@@ -148,3 +153,10 @@ messages:
   transaction-blocked: "<red>Tu dois passer par un marchand pour acheter ou vendre."
   # Si le marchand n'a pas de réplique « Joueur sans la permission requise ».
   no-permission: "<red>Ce marchand refuse de commercer avec toi."
+  # Clic sur un marchand fermé (s'il n'a pas de réplique « boutique fermée »). <hours> = ses horaires.
+  closed: "<gray>La boutique est fermée. Reviens entre <yellow><hours></yellow> (heure du jeu)."
+  # Envoyé au joueur à l'ouverture du shop pendant une promo (vide = rien). <promo> = la promo.
+  promo-active: "<gold>★ <yellow><promo></yellow> !"
+  # Annonce à tout le serveur quand un marchand ambulant change de place (vide = rien).
+  # <npc>, <spot> (nom de l'emplacement), <x> <y> <z>, <world>.
+  wander-arrived: "<gold>[Marchand]</gold> <npc> <gray>s'est installé à <yellow><spot></yellow> <dark_gray>(<x>, <y>, <z>)"

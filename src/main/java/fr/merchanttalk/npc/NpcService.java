@@ -80,12 +80,16 @@ public final class NpcService {
     public void spawnOrUpdate(Merchant m) {
         if (!ready) return;
         remove(m);
-        if (m.location == null) return;
-        Location loc = m.location.toBukkit();
+        var stored = m.currentLocation();
+        if (stored == null) return;
+        Location loc = stored.toBukkit();
         if (loc == null) {
-            plugin.getLogger().warning("Le monde '" + m.location.world + "' du marchand " + m.id + " n'est pas chargé.");
+            plugin.getLogger().warning("Le monde '" + stored.world + "' du marchand " + m.id + " n'est pas chargé.");
             return;
         }
+        // Horaires : fermé en mode « il disparaît » -> pas de PNJ.
+        if (plugin.schedule() != null && plugin.schedule().isHidden(m)) return;
+        boolean asleep = plugin.schedule() != null && plugin.schedule().isAsleep(m);
         try {
             NpcData data = new NpcData(npcName(m), CREATOR, loc);
             data.setDisplayName(m.displayName == null || m.displayName.isBlank() ? "<empty>" : m.displayName);
@@ -105,6 +109,7 @@ public final class NpcService {
             FancyNpcsPlugin.get().getNpcManager().registerNpc(npc);
             npc.create();
             npc.spawnForAll();
+            if (asleep) fr.merchanttalk.features.AnimationService.setPose(npc, "sleeping");
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Impossible de créer le PNJ du marchand " + m.id, e);
         }
@@ -125,7 +130,8 @@ public final class NpcService {
             Npc npc = FancyNpcsPlugin.get().getNpcManager().getNpc(npcName(m));
             if (npc != null && npc.getData().getLocation() != null) return npc.getData().getLocation();
         }
-        return m.location == null ? null : m.location.toBukkit();
+        var stored = m.currentLocation();
+        return stored == null ? null : stored.toBukkit();
     }
 
     /**

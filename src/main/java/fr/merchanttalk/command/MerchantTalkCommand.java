@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 public final class MerchantTalkCommand implements CommandExecutor, TabCompleter {
     private static final Pattern ID = Pattern.compile("[a-z0-9_-]{1,32}");
     private static final MiniMessage MM = MiniMessage.miniMessage();
-    private static final List<String> SUBS = List.of("help", "list", "create", "place", "tp", "delete", "open", "web", "sendpack", "stats", "blocked", "reload");
+    private static final List<String> SUBS = List.of("help", "list", "create", "place", "tp", "delete", "open", "web", "sendpack", "stats", "blocked", "reload", "addspot", "spots", "delspot", "nextspot");
 
     private final MerchantTalkPlugin plugin;
 
@@ -45,6 +45,10 @@ public final class MerchantTalkCommand implements CommandExecutor, TabCompleter 
             case "stats" -> stats(sender);
             case "blocked" -> msg(sender, "<gray>Commandes bloquées pour les joueurs : <yellow>"
                     + escape(String.join(", ", new java.util.TreeSet<>(plugin.commandBlocker().blocked()))));
+            case "addspot" -> addSpot(sender, args);
+            case "spots" -> listSpots(sender, args);
+            case "delspot" -> delSpot(sender, args);
+            case "nextspot" -> nextSpot(sender, args);
             case "reload" -> {
                 plugin.reloadAll();
                 msg(sender, "<green>MerchantTalk rechargé.");
@@ -66,6 +70,10 @@ public final class MerchantTalkCommand implements CommandExecutor, TabCompleter 
         msg(s, "<yellow>/" + label + " sendpack [joueur]</yellow> <gray>renvoie le resource pack");
         msg(s, "<yellow>/" + label + " stats</yellow> <gray>statistiques des marchands");
         msg(s, "<yellow>/" + label + " blocked</yellow> <gray>liste des commandes du shop bloquées");
+        msg(s, "<yellow>/" + label + " addspot <id> [nom]</yellow> <gray>ajoute ta position à la tournée d'un marchand ambulant");
+        msg(s, "<yellow>/" + label + " spots <id></yellow> <gray>liste les emplacements de la tournée");
+        msg(s, "<yellow>/" + label + " delspot <id> <numéro></yellow> <gray>retire un emplacement");
+        msg(s, "<yellow>/" + label + " nextspot <id></yellow> <gray>envoie le marchand à l'emplacement suivant");
         msg(s, "<yellow>/" + label + " reload</yellow> <gray>recharge la configuration");
     }
 
@@ -165,6 +173,8 @@ public final class MerchantTalkCommand implements CommandExecutor, TabCompleter 
         plugin.shop().closeFor(id);
         plugin.npcs().remove(m);
         plugin.store().data().merchants.remove(id);
+        plugin.customers().forgetMerchant(id);
+        plugin.ai().forgetMerchant(id);
         plugin.store().save();
         msg(s, "<green>Marchand <yellow>" + escape(id) + "</yellow> supprimé.");
     }
@@ -185,6 +195,88 @@ public final class MerchantTalkCommand implements CommandExecutor, TabCompleter 
             return;
         }
         plugin.shop().open(target, m);
+    }
+
+    private Merchant merchantArg(CommandSender s, String[] args, String usage) {
+        if (args.length < 2) {
+            msg(s, "<red>Usage : " + usage);
+            return null;
+        }
+        Merchant m = plugin.store().merchant(args[1].toLowerCase(Locale.ROOT));
+        if (m == null) msg(s, "<red>Marchand inconnu.");
+        return m;
+    }
+
+    private void addSpot(CommandSender s, String[] args) {
+        if (!(s instanceof Player p)) {
+            msg(s, "<red>Commande à utiliser en jeu.");
+            return;
+        }
+        Merchant m = merchantArg(s, args, "/mt addspot <id> [nom]");
+        if (m == null) return;
+        // Le premier ajout garde aussi la place actuelle du marchand comme point de départ.
+        if (m.spots().isEmpty() && m.location != null) {
+            m.spots().add(new fr.merchanttalk.model.Spot("Point de départ", m.location));
+        }
+        String name = args.length >= 3 ? String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length)) : "Emplacement " + (m.spots().size() + 1);
+        Location loc = p.getLocation();
+        loc.setPitch(0);
+        m.spots().add(new fr.merchanttalk.model.Spot(name, StoredLocation.of(loc)));
+        if (m.location == null) m.location = StoredLocation.of(loc);
+        plugin.store().save();
+        msg(s, "<green>Emplacement <yellow>" + escape(name) + "</yellow> ajouté (" + m.spots().size() + " au total)."
+                + (m.wanderEnabled ? "" : " <gray>Active « Marchand ambulant » sur le site pour lancer la tournée."));
+    }
+
+    private void listSpots(CommandSender s, String[] args) {
+        Merchant m = merchantArg(s, args, "/mt spots <id>");
+        if (m == null) return;
+        if (m.spots().isEmpty()) {
+            msg(s, "<gray>Aucun emplacement. Ajoute-en avec <yellow>/mt addspot " + m.id + " <nom>");
+            return;
+        }
+        msg(s, "<gold>Tournée de " + escape(m.id) + " :");
+        for (int i = 0; i < m.spots().size(); i++) {
+            var spot = m.spots().get(i);
+            boolean current = m.wanderEnabled && Math.floorMod(m.spotIndex, m.spots().size()) == i;
+            msg(s, (current ? "<green>▶ " : "<dark_gray>- ") + "<yellow>" + (i + 1) + ". " + escape(spot.name == null ? "" : spot.name)
+                    + "</yellow> <gray>" + spot.location.world + " " + (int) spot.location.x + " " + (int) spot.location.y + " " + (int) spot.location.z);
+        }
+    }
+
+    private void delSpot(CommandSender s, String[] args) {
+        Merchant m = merchantArg(s, args, "/mt delspot <id> <numéro>");
+        if (m == null) return;
+        int n;
+        try {
+            n = Integer.parseInt(args.length >= 3 ? args[2] : "") - 1;
+        } catch (NumberFormatException e) {
+            msg(s, "<red>Usage : /mt delspot <id> <numéro> (voir /mt spots " + m.id + ")");
+            return;
+        }
+        if (n < 0 || n >= m.spots().size()) {
+            msg(s, "<red>Numéro invalide.");
+            return;
+        }
+        var removed = m.spots().remove(n);
+        if (m.spotIndex >= m.spots().size()) m.spotIndex = 0;
+        plugin.store().save();
+        plugin.npcs().spawnOrUpdate(m);
+        msg(s, "<green>Emplacement <yellow>" + escape(removed.name == null ? "" : removed.name) + "</yellow> retiré.");
+    }
+
+    private void nextSpot(CommandSender s, String[] args) {
+        Merchant m = merchantArg(s, args, "/mt nextspot <id>");
+        if (m == null) return;
+        if (m.spots().isEmpty()) {
+            msg(s, "<red>Ce marchand n'a aucun emplacement.");
+            return;
+        }
+        plugin.schedule().moveNext(m);
+        plugin.store().save();
+        var spot = m.currentSpot();
+        msg(s, "<green>Marchand envoyé à <yellow>" + escape(spot == null || spot.name == null ? "?" : spot.name) + "</yellow>."
+                + (m.wanderEnabled ? "" : " <gray>(la tournée est désactivée : il restera à sa place fixe)"));
     }
 
     private void web(CommandSender s) {
@@ -221,7 +313,7 @@ public final class MerchantTalkCommand implements CommandExecutor, TabCompleter 
         List<String> out = new ArrayList<>();
         if (args.length == 1) {
             for (String sub : SUBS) if (sub.startsWith(args[0].toLowerCase(Locale.ROOT))) out.add(sub);
-        } else if (args.length == 2 && List.of("place", "tp", "delete", "open").contains(args[0].toLowerCase(Locale.ROOT))) {
+        } else if (args.length == 2 && List.of("place", "tp", "delete", "open", "addspot", "spots", "delspot", "nextspot").contains(args[0].toLowerCase(Locale.ROOT))) {
             for (String id : plugin.store().data().merchants.keySet()) if (id.startsWith(args[1].toLowerCase(Locale.ROOT))) out.add(id);
         } else if (args.length == 3 && args[0].equalsIgnoreCase("open") || args.length == 2 && args[0].equalsIgnoreCase("sendpack")) {
             String prefix = args[args.length - 1].toLowerCase(Locale.ROOT);

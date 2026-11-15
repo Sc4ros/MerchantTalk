@@ -35,7 +35,19 @@ public final class ShopService {
             }
             return;
         }
+        if (!plugin.schedule().isOpen(merchant)) {
+            if (merchant.lines(Trigger.CLOSED).isEmpty()) {
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        plugin.getConfig().getString("messages.prefix", "") + plugin.getConfig().getString("messages.closed", "<red>Fermé."),
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("hours",
+                                fr.merchanttalk.features.CustomerService.hoursLabel(merchant.openHours))));
+            } else {
+                plugin.dialogue().speak(merchant, player, Trigger.CLOSED);
+            }
+            return;
+        }
         sessions.put(player.getUniqueId(), merchant.id);
+        plugin.customers().visit(merchant, player);
         merchant.stats().opens++;
         merchant.stats().lastActivity = System.currentTimeMillis();
         plugin.store().markDirty();
@@ -49,6 +61,13 @@ public final class ShopService {
         if (command.startsWith("/")) command = command.substring(1);
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
         plugin.dialogue().speak(merchant, player, Trigger.OPEN);
+        if (plugin.promo().active(merchant)) {
+            String promoMsg = plugin.getConfig().getString("messages.promo-active", "");
+            if (promoMsg != null && !promoMsg.isBlank()) {
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(promoMsg,
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("promo", plugin.promo().describe(merchant))));
+            }
+        }
     }
 
     /** @return le marchand avec lequel le joueur est en train de commercer, ou null. */

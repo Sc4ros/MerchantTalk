@@ -64,6 +64,17 @@ final class ApiHandler {
                     testSpeak(ex, id);
                     return;
                 }
+                case "wander-next" -> {
+                    plugin.sync(() -> {
+                        Merchant m = requireMerchant(id);
+                        if (m.spots().isEmpty()) throw new ApiException(400, "Ce marchand n'a aucun emplacement. Ajoute-en en jeu avec /mt addspot " + m.id + " <nom>.");
+                        plugin.schedule().moveNext(m);
+                        plugin.store().save();
+                        return null;
+                    });
+                    WebServer.sendJson(ex, 200, ok());
+                    return;
+                }
                 case "ai-test" -> {
                     aiTest(ex, id);
                     return;
@@ -99,6 +110,25 @@ final class ApiHandler {
                 }
                 if (parts.length == 2 && method.equals("DELETE")) {
                     deleteMerchant(ex, id);
+                    return;
+                }
+                if (parts.length == 4 && parts[2].equals("spots") && method.equals("DELETE")) {
+                    int index;
+                    try {
+                        index = Integer.parseInt(parts[3]);
+                    } catch (NumberFormatException e) {
+                        throw new ApiException(400, "Emplacement invalide");
+                    }
+                    plugin.sync(() -> {
+                        Merchant m = requireMerchant(id);
+                        if (index < 0 || index >= m.spots().size()) throw new ApiException(404, "Emplacement introuvable");
+                        m.spots().remove(index);
+                        if (m.spotIndex >= m.spots().size()) m.spotIndex = 0;
+                        plugin.store().save();
+                        plugin.npcs().spawnOrUpdate(m);
+                        return null;
+                    });
+                    WebServer.sendJson(ex, 200, ok());
                     return;
                 }
                 if (parts.length == 3 && parts[2].equals("skin")) {
@@ -151,7 +181,16 @@ final class ApiHandler {
         JsonArray merchants = new JsonArray();
         for (Merchant m : plugin.store().data().merchants.values()) {
             JsonObject j = plugin.gson().toJsonTree(m).getAsJsonObject();
-            j.addProperty("placed", m.location != null);
+            j.addProperty("placed", m.currentLocation() != null);
+            j.addProperty("promoActive", plugin.promo().active(m));
+            j.addProperty("openNow", plugin.schedule().isOpen(m));
+            j.addProperty("customerCount", plugin.customers().count(m));
+            j.add("topCustomers", plugin.gson().toJsonTree(plugin.customers().top(m, 5)));
+            var spot = m.currentSpot();
+            if (spot != null) j.addProperty("currentSpot", spot.name);
+            if (m.wanderEnabled && m.spots().size() >= 2 && m.wanderLastMove > 0) {
+                j.addProperty("nextMoveIn", Math.max(0, m.wanderLastMove + Math.max(1, m.wanderMinutes) * 60_000L - System.currentTimeMillis()));
+            }
             // Heure et météo actuelles là où se trouve le marchand.
             org.bukkit.Location loc = plugin.npcs().npcLocation(m);
             if (loc != null && loc.getWorld() != null) {
@@ -301,7 +340,7 @@ final class ApiHandler {
             Merchant m = requireMerchant(id);
             org.bukkit.Location loc = plugin.npcs().npcLocation(m);
             org.bukkit.World world = loc != null ? loc.getWorld() : plugin.getServer().getWorlds().getFirst();
-            return plugin.ai().systemPrompt(m, "Testeur", world);
+            return plugin.ai().systemPrompt(m, null, "Testeur", world);
         });
         String reply;
         try {
@@ -398,6 +437,44 @@ final class ApiHandler {
             if (body.has("slimSkin")) m.slimSkin = body.get("slimSkin").getAsBoolean();
             if (body.has("lookAtPlayer")) m.lookAtPlayer = body.get("lookAtPlayer").getAsBoolean();
             if (body.has("talkParticles")) m.talkParticles = body.get("talkParticles").getAsBoolean();
+            if (body.has("regularVisits")) m.regularVisits = (int) clamp(body.get("regularVisits").getAsDouble(), 0, 100000);
+            if (body.has("animations")) m.animations = body.get("animations").getAsBoolean();
+            if (body.has("promoEnabled")) m.promoEnabled = body.get("promoEnabled").getAsBoolean();
+            if (body.has("promoLabel")) m.promoLabel = limit(str(body, "promoLabel").trim(), 60);
+            if (body.has("promoBuyDiscount")) m.promoBuyDiscount = (int) clamp(body.get("promoBuyDiscount").getAsDouble(), 0, 90);
+            if (body.has("promoSellBonus")) m.promoSellBonus = (int) clamp(body.get("promoSellBonus").getAsDouble(), 0, 200);
+            if (body.has("promoDays")) {
+                java.util.List<String> days = new java.util.ArrayList<>();
+                for (String d : str(body, "promoDays").split(",")) {
+                    try {
+                        days.add(java.time.DayOfWeek.valueOf(d.trim().toUpperCase(Locale.ROOT)).name());
+                    } catch (IllegalArgumentException ignored) {
+                        // jour inconnu
+                    }
+                }
+                m.promoDays = String.join(",", days);
+            }
+            if (body.has("hoursEnabled")) {
+                boolean v = body.get("hoursEnabled").getAsBoolean();
+                m.hoursEnabled = v;
+            }
+            if (body.has("openHours")) {
+                String h = str(body, "openHours").replace(" ", "").replace("h", "");
+                if (!h.matches("\\d{1,2}(\\.\\d+)?-\\d{1,2}(\\.\\d+)?")) throw new ApiException(400, "Horaires invalides : écris par exemple 6-19 ou 20-4.");
+                m.openHours = h;
+            }
+            if (body.has("closedMode")) {
+                String c = str(body, "closedMode").toUpperCase(Locale.ROOT);
+                if (!java.util.Set.of("REFUSE", "SLEEP", "HIDE").contains(c)) c = "SLEEP";
+                m.closedMode = c;
+            }
+            if (body.has("wanderEnabled")) {
+                boolean v = body.get("wanderEnabled").getAsBoolean();
+                if (v && !m.wanderEnabled) m.wanderLastMove = System.currentTimeMillis();
+                m.wanderEnabled = v;
+            }
+            if (body.has("wanderMinutes")) m.wanderMinutes = (int) clamp(body.get("wanderMinutes").getAsDouble(), 1, 100000);
+            if (body.has("wanderAnnounce")) m.wanderAnnounce = body.get("wanderAnnounce").getAsBoolean();
             if (body.has("aiEnabled")) m.aiEnabled = body.get("aiEnabled").getAsBoolean();
             if (body.has("aiPersonality")) m.aiPersonality = limit(str(body, "aiPersonality"), 4000);
             if (body.has("aiNames")) m.aiNames = limit(str(body, "aiNames"), 200);
@@ -447,6 +524,8 @@ final class ApiHandler {
             plugin.npcs().remove(m);
             plugin.store().data().merchants.remove(id);
             plugin.ai().forgetMerchant(id);
+            plugin.customers().forgetMerchant(id);
+            plugin.schedule().forget(id);
             plugin.store().save();
             return m.skinFile;
         });

@@ -9,7 +9,10 @@ public enum Trigger {
     NO_MONEY("Pas assez d'argent"),
     FAIL("Transaction impossible (inventaire plein, pas assez d'objets...)"),
     GREET("Un joueur s'approche"),
-    DENIED("Joueur sans la permission requise");
+    DENIED("Joueur sans la permission requise"),
+    REGULAR("Un habitué s'approche (remplace le salut)"),
+    PROMO("Annonce de la promo quand un joueur s'approche"),
+    CLOSED("Clic quand la boutique est fermée");
 
     private final String label;
 

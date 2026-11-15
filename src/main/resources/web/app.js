@@ -394,6 +394,8 @@ function renderEditor() {
   look.addEventListener("change", () => { m.lookAtPlayer = look.checked; markDirty(); });
   const particles = el("input", { type: "checkbox", checked: m.talkParticles !== false });
   particles.addEventListener("change", () => { m.talkParticles = particles.checked; markDirty(); });
+  const anim = el("input", { type: "checkbox", checked: !!m.animations });
+  anim.addEventListener("change", () => { m.animations = anim.checked; markDirty(); });
 
   content.append(el("div", { class: "card" },
     el("h2", { text: "Réglages" }),
@@ -406,7 +408,8 @@ function renderEditor() {
       field("Délai avant de resaluer le même joueur (secondes)", cooldown)),
     el("div", { class: "checks" },
       el("label", { class: "check" }, look, "Le PNJ tourne la tête vers les joueurs"),
-      el("label", { class: "check" }, particles, "Notes de musique au-dessus de sa tête quand il parle"))));
+      el("label", { class: "check" }, particles, "Notes de musique au-dessus de sa tête quand il parle"),
+      el("label", { class: "check" }, anim, "Animations : il s'incline pour saluer, prend l'objet acheté en main, des pièces volent"))));
 
   // Skin
   const fileInput = el("input", { type: "file", accept: "image/png", hidden: true });
@@ -432,6 +435,10 @@ function renderEditor() {
   content.append(skinCard);
 
   content.append(renderAiCard(m));
+  content.append(renderCustomersCard(m));
+  content.append(renderPromoCard(m));
+  content.append(renderHoursCard(m));
+  content.append(renderWanderCard(m));
 
   // Dialogues
   const dialogues = el("div", { class: "card" },
@@ -440,7 +447,11 @@ function renderEditor() {
       el("label", { class: "inline-field" }, "Tester sur :", el("select", { id: "test-player" }))),
     el("p", { class: "muted", style: "margin-top:0" },
       "À chaque moment, le marchand dit une réplique tirée au hasard (jamais deux fois la même d'affilée). Chaque réplique peut avoir un texte (chat) et/ou une voix. ",
-      el("code", { text: "{player}" }), " = pseudo du joueur. L'aperçu montre le message tel qu'il apparaîtra dans le chat."),
+      el("code", { text: "{player}" }), " = pseudo du joueur, ",
+      el("code", { text: "{visits}" }), " = ses visites, ",
+      el("code", { text: "{spent}" }), " / ", el("code", { text: "{earned}" }), " = ce qu'il a dépensé / gagné ici, ",
+      el("code", { text: "{promo}" }), ", ", el("code", { text: "{discount}" }), ", ", el("code", { text: "{bonus}" }), " = la promo, ",
+      el("code", { text: "{hours}" }), " = les horaires. L'aperçu montre le message tel qu'il apparaîtra dans le chat."),
     el("p", { class: "muted small-text", style: "margin-bottom:10px" },
       "🕐 / 🌦️ : une réplique peut être réservée à un moment de la journée (matin, jour, soir, nuit) ou à une météo. ",
       "Quand une réplique spéciale correspond au moment, le marchand la choisit en priorité. ",
@@ -601,6 +612,11 @@ async function saveMerchant() {
       displayName: m.displayName, section: m.section, mode: m.mode || "SHOP", lookAtPlayer: m.lookAtPlayer, slimSkin: m.slimSkin,
       talkParticles: m.talkParticles !== false, permission: m.permission || "",
       aiEnabled: !!m.aiEnabled, aiPersonality: m.aiPersonality || "", aiNames: m.aiNames || "",
+      animations: !!m.animations, regularVisits: m.regularVisits ?? 10,
+      promoEnabled: !!m.promoEnabled, promoLabel: m.promoLabel || "Promo", promoBuyDiscount: m.promoBuyDiscount ?? 0,
+      promoSellBonus: m.promoSellBonus ?? 0, promoDays: m.promoDays || "",
+      hoursEnabled: !!m.hoursEnabled, openHours: m.openHours || "6-19", closedMode: m.closedMode || "SLEEP",
+      wanderEnabled: !!m.wanderEnabled, wanderMinutes: m.wanderMinutes ?? 60, wanderAnnounce: m.wanderAnnounce !== false,
       greetRadius: m.greetRadius, greetCooldownSeconds: m.greetCooldownSeconds, lines,
     });
     dirty = false;
@@ -951,4 +967,146 @@ function renderAiCard(m) {
     el("h3", { text: "Tester la discussion", style: "margin:14px 0 6px" }),
     log,
     el("div", { class: "ai-input" }, input, send, reset));
+}
+
+// ---------------------------------------------------------------- clients, promo, horaires, tournée
+
+function numberInput(value, min, max, step, onChange) {
+  const i = el("input", { type: "number", min, max, step, value });
+  i.addEventListener("input", () => { onChange(i.value === "" ? 0 : Number(i.value)); markDirty(); });
+  return i;
+}
+
+function optionToggle(checked, label, onChange, body) {
+  const box = el("input", { type: "checkbox", checked: !!checked });
+  const sync = () => body.classList.toggle("hidden", !box.checked);
+  box.addEventListener("change", () => { onChange(box.checked); sync(); markDirty(); });
+  sync();
+  return el("label", { class: "check" }, box, label);
+}
+
+function money(v) {
+  return Number(v || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+}
+
+function renderCustomersCard(m) {
+  const regular = numberInput(m.regularVisits ?? 10, 0, 100000, 1, (v) => { m.regularVisits = v; });
+  const top = m.topCustomers || [];
+  const table = top.length
+    ? el("table", { class: "mini-table" },
+        el("tr", {}, el("th", { text: "Joueur" }), el("th", { text: "Visites" }), el("th", { text: "Dépensé" }), el("th", { text: "Gagné" })),
+        ...top.map((c) => el("tr", {},
+          el("td", { text: c.name || "?" }), el("td", { text: String(c.visits) }),
+          el("td", { text: money(c.spent) }), el("td", { text: money(c.earned) }))))
+    : el("p", { class: "muted", text: "Aucun client pour l'instant." });
+  return el("div", { class: "card" },
+    el("h2", { text: "🧠 Clients fidèles" }),
+    el("p", { class: "muted", style: "margin-top:0" },
+      "Le marchand se souvient de chaque joueur : visites, achats, ventes. Un habitué entend la réplique « Un habitué s'approche » au lieu du salut normal, et l'IA sait à qui elle parle."),
+    el("div", { class: "grid-2" }, field("Visites pour devenir un habitué (0 = jamais)", regular), el("div")),
+    el("h3", { text: `Meilleurs clients (${m.customerCount || 0} au total)`, style: "margin:12px 0 6px" }),
+    table);
+}
+
+const DAYS = [["MONDAY", "Lun"], ["TUESDAY", "Mar"], ["WEDNESDAY", "Mer"], ["THURSDAY", "Jeu"], ["FRIDAY", "Ven"], ["SATURDAY", "Sam"], ["SUNDAY", "Dim"]];
+
+function renderPromoCard(m) {
+  const body = el("div", { class: "option-body" });
+  const label = el("input", { type: "text", value: m.promoLabel || "Promo", maxlength: 60, placeholder: "Soldes du week-end" });
+  label.addEventListener("input", () => { m.promoLabel = label.value; markDirty(); });
+  const buy = numberInput(m.promoBuyDiscount ?? 10, 0, 90, 1, (v) => { m.promoBuyDiscount = v; });
+  const sell = numberInput(m.promoSellBonus ?? 0, 0, 200, 1, (v) => { m.promoSellBonus = v; });
+  const selected = new Set((m.promoDays || "").split(",").filter(Boolean));
+  const days = el("div", { class: "days" }, ...DAYS.map(([id, txt]) => {
+    const c = el("input", { type: "checkbox", checked: selected.has(id) });
+    c.addEventListener("change", () => {
+      c.checked ? selected.add(id) : selected.delete(id);
+      m.promoDays = DAYS.map(([d]) => d).filter((d) => selected.has(d)).join(",");
+      markDirty();
+    });
+    return el("label", { class: "check day" }, c, txt);
+  }));
+  body.append(
+    el("div", { class: "grid-2" },
+      field("Nom de la promo", label, "Utilisable dans les répliques avec {promo}"),
+      field("Réduction sur les achats (%)", buy, "Ex. 20 = les joueurs paient 20 % moins cher"),
+      field("Bonus sur les ventes (%)", sell, "Ex. 10 = le marchand rachète 10 % plus cher")),
+    el("div", { class: "field" }, "Jours de la promo (aucun coché = tous les jours, heure du serveur)", days),
+    el("p", { class: "muted small-text" },
+      "Le prix payé est ajusté au moment de l'achat ou de la vente ; le menu du shop affiche encore le prix normal, le joueur est prévenu dans le chat en ouvrant la boutique. ",
+      "Ajoute des répliques « Annonce de la promo » : il les dira aux joueurs qui s'approchent."),
+    m.promoEnabled ? el("p", { class: m.promoActive ? "status ok" : "status", text: m.promoActive ? "✅ Promo active en ce moment" : "⏸ Pas active aujourd'hui" }) : null);
+  return el("div", { class: "card" },
+    el("h2", { text: "🏷️ Promotion" }),
+    optionToggle(m.promoEnabled, "Activer une promotion", (v) => { m.promoEnabled = v; }, body),
+    body);
+}
+
+function renderHoursCard(m) {
+  const body = el("div", { class: "option-body" });
+  const hours = el("input", { type: "text", value: m.openHours || "6-19", maxlength: 11, placeholder: "6-19" });
+  hours.addEventListener("input", () => { m.openHours = hours.value.trim(); markDirty(); });
+  const mode = el("select", {},
+    el("option", { value: "SLEEP", text: "😴 Il dort (allongé, ne répond pas)" }),
+    el("option", { value: "HIDE", text: "👻 Il disparaît" }),
+    el("option", { value: "REFUSE", text: "🚫 Il reste debout mais refuse de vendre" }));
+  mode.value = m.closedMode || "SLEEP";
+  mode.addEventListener("change", () => { m.closedMode = mode.value; markDirty(); });
+  body.append(
+    el("div", { class: "grid-2" },
+      field("Ouvert de... à... (heures du jeu)", hours, "6 = lever du soleil, 18 = coucher. « 20-4 » = ouvert la nuit."),
+      field("Quand c'est fermé", mode)),
+    el("p", { class: "muted small-text" }, "Ajoute des répliques « Clic quand la boutique est fermée » pour qu'il réponde avec sa voix. ",
+      el("code", { text: "{hours}" }), " affiche ses horaires."),
+    m.hoursEnabled ? el("p", { class: m.openNow ? "status ok" : "status", text: m.openNow ? "✅ Ouvert en ce moment" : "🌙 Fermé en ce moment" }) : null);
+  return el("div", { class: "card" },
+    el("h2", { text: "🕒 Horaires d'ouverture" }),
+    optionToggle(m.hoursEnabled, "Le marchand a des horaires", (v) => { m.hoursEnabled = v; }, body),
+    body);
+}
+
+function renderWanderCard(m) {
+  const body = el("div", { class: "option-body" });
+  const minutes = numberInput(m.wanderMinutes ?? 60, 1, 100000, 1, (v) => { m.wanderMinutes = v; });
+  const announce = el("input", { type: "checkbox", checked: m.wanderAnnounce !== false });
+  announce.addEventListener("change", () => { m.wanderAnnounce = announce.checked; markDirty(); });
+  const spots = m.spots || [];
+  const current = spots.length ? ((m.spotIndex % spots.length) + spots.length) % spots.length : -1;
+  const list = spots.length
+    ? el("div", { class: "spot-list" }, ...spots.map((s, i) => el("div", { class: "spot" + (i === current && m.wanderEnabled ? " current" : "") },
+        el("span", { text: (i === current && m.wanderEnabled ? "▶ " : "") + (i + 1) + ". " + (s.name || "?") }),
+        el("span", { class: "muted small-text", text: s.location ? `${s.location.world} ${Math.round(s.location.x)} ${Math.round(s.location.y)} ${Math.round(s.location.z)}` : "" }),
+        el("button", { class: "btn ghost small", title: "Retirer cet emplacement", onclick: () => removeSpot(m, i) }, "✕"))))
+    : el("p", { class: "muted", text: "Aucun emplacement pour l'instant." });
+  const next = el("button", { class: "btn small", disabled: spots.length < 2, onclick: () => wanderNext(m) }, "➡️ Le déplacer maintenant");
+  const timer = m.nextMoveIn != null ? el("span", { class: "muted small-text", text: `Prochain départ dans ${Math.ceil(m.nextMoveIn / 60000)} min` }) : null;
+  body.append(
+    el("div", { class: "grid-2" }, field("Il change de place toutes les (minutes réelles)", minutes), el("div")),
+    el("label", { class: "check" }, announce, "Annoncer à tout le serveur où il s'installe"),
+    el("p", { class: "muted small-text" }, "Pour ajouter un emplacement, va à l'endroit voulu en jeu et tape ",
+      el("code", { text: `/mt addspot ${m.id} <nom du lieu>` }), ". Il faut au moins 2 emplacements."),
+    list,
+    el("div", { class: "row-between" }, timer || el("span"), next));
+  return el("div", { class: "card" },
+    el("h2", { text: "🧭 Marchand ambulant" }),
+    optionToggle(m.wanderEnabled, "Il voyage entre plusieurs emplacements", (v) => { m.wanderEnabled = v; }, body),
+    body);
+}
+
+async function removeSpot(m, i) {
+  if (!confirm("Retirer cet emplacement de la tournée ?")) return;
+  try {
+    await api("DELETE", "merchants/" + encodeURIComponent(m.id) + "/spots/" + i);
+    toast("Emplacement retiré");
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function wanderNext(m) {
+  if (dirty) { toast("Enregistre d'abord tes modifications.", true); return; }
+  try {
+    await api("POST", "merchants/" + encodeURIComponent(m.id) + "/wander-next", {});
+    toast("Le marchand est parti vers son prochain emplacement");
+    await refresh();
+  } catch (e) { toast(e.message, true); }
 }

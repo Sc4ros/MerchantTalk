@@ -79,7 +79,8 @@ public final class DialogueService {
         boolean repeatable = trigger == Trigger.BUY || trigger == Trigger.SELL;
         if (!force) {
             // Achats/ventes à la chaîne ou salut : jamais mis en attente, simplement ignorés si le marchand parle déjà.
-            if ((repeatable || trigger == Trigger.GREET) && busy) return null;
+            boolean greeting = trigger == Trigger.GREET || trigger == Trigger.REGULAR || trigger == Trigger.PROMO;
+            if ((repeatable || greeting) && busy) return null;
             long minInterval = plugin.getConfig().getLong("dialogue.min-interval-ms", 1200);
             if (repeatable && previous != null && now - previous.at() < minInterval) return null;
         }
@@ -177,7 +178,8 @@ public final class DialogueService {
     }
 
     public Component format(Merchant merchant, Player player, String text) {
-        return format(merchant.displayName == null ? merchant.id : merchant.displayName, player.getName(), text);
+        return format(merchant.displayName == null ? merchant.id : merchant.displayName, player.getName(),
+                plugin.customers().placeholders(merchant, player, text));
     }
 
     /** Message de chat d'une réplique (utilisé aussi pour l'aperçu du site). */

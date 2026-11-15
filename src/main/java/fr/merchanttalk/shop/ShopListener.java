@@ -77,6 +77,7 @@ public final class ShopListener implements Listener {
         String type = event.getTransactionType().name();
         String result = event.getTransactionResult().name();
         double amount = totalPrice(event);
+        org.bukkit.inventory.ItemStack traded = tradedItem(event);
         runSync(() -> {
             Merchant merchant = plugin.shop().session(player);
             if (merchant == null) return;
@@ -94,6 +95,8 @@ public final class ShopListener implements Listener {
                 }
                 stats.lastActivity = System.currentTimeMillis();
                 plugin.store().markDirty();
+                plugin.customers().transaction(merchant, player, sell, amount);
+                plugin.animations().trade(merchant, traded, sell);
             } else if (result.equals("INSUFFICIENT_FUNDS")) {
                 trigger = Trigger.NO_MONEY;
                 stats.noMoney++;
@@ -105,6 +108,21 @@ public final class ShopListener implements Listener {
             }
             plugin.dialogue().speak(merchant, player, trigger);
         });
+    }
+
+    /** L'objet acheté ou vendu (le premier, pour une vente groupée). */
+    private static org.bukkit.inventory.ItemStack tradedItem(PostTransactionEvent event) {
+        try {
+            var items = event.getItems();
+            if (items != null && !items.isEmpty()) return items.keySet().iterator().next().getItemToGive();
+        } catch (Throwable ignored) {
+            // transaction simple
+        }
+        try {
+            return event.getItemStack();
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     /** Montant total de la transaction (une ou plusieurs monnaies additionnées). */

@@ -3,6 +3,11 @@ package fr.merchanttalk;
 import com.google.gson.Gson;
 import fr.merchanttalk.ai.AiChatListener;
 import fr.merchanttalk.ai.AiService;
+import fr.merchanttalk.ai.CatalogService;
+import fr.merchanttalk.features.AnimationService;
+import fr.merchanttalk.features.CustomerService;
+import fr.merchanttalk.features.PromoService;
+import fr.merchanttalk.features.ScheduleService;
 import fr.merchanttalk.command.MerchantTalkCommand;
 import fr.merchanttalk.dialogue.DialogueService;
 import fr.merchanttalk.dialogue.ProximityTask;
@@ -37,6 +42,11 @@ public final class MerchantTalkPlugin extends JavaPlugin {
     private ResourcePackService pack;
     private WebServer web;
     private AiService ai;
+    private CatalogService catalog;
+    private CustomerService customers;
+    private PromoService promo;
+    private AnimationService animations;
+    private ScheduleService schedule;
     /** Sessions du site (jeton -> expiration), conservées lors d'un /mt reload. */
     private final java.util.Map<String, Long> webSessions = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -62,6 +72,10 @@ public final class MerchantTalkPlugin extends JavaPlugin {
         commandBlocker = new CommandBlocker(this);
         pack = new ResourcePackService(this);
         ai = new AiService(this);
+        catalog = new CatalogService(this);
+        customers = new CustomerService(this);
+        promo = new PromoService(this);
+        animations = new AnimationService(this);
         pack.buildNow();
 
         var pm = getServer().getPluginManager();
@@ -69,6 +83,7 @@ public final class MerchantTalkPlugin extends JavaPlugin {
         pm.registerEvents(commandBlocker, this);
         pm.registerEvents(pack, this);
         pm.registerEvents(new AiChatListener(this), this);
+        pm.registerEvents(promo, this);
 
         MerchantTalkCommand command = new MerchantTalkCommand(this);
         PluginCommand pc = getCommand("merchanttalk");
@@ -78,6 +93,7 @@ public final class MerchantTalkPlugin extends JavaPlugin {
         }
 
         startProximity();
+        startSchedule();
         startWeb();
         logAiStatus();
         // Sauvegarde automatique des statistiques (toutes les minutes).
@@ -94,6 +110,8 @@ public final class MerchantTalkPlugin extends JavaPlugin {
     public void onDisable() {
         if (web != null) web.stop();
         if (proximity != null) proximity.cancel();
+        if (schedule != null) schedule.cancel();
+        if (animations != null) animations.cancelAll();
         if (npcs != null) npcs.despawnAll();
         if (store != null) store.saveIfDirty();
     }
@@ -108,9 +126,17 @@ public final class MerchantTalkPlugin extends JavaPlugin {
         commandBlocker.refresh();
         npcs.spawnAll();
         pack.rebuild(true);
+        catalog.clear();
         startProximity();
+        startSchedule();
         startWeb();
         logAiStatus();
+    }
+
+    private void startSchedule() {
+        if (schedule != null) schedule.cancel();
+        schedule = new ScheduleService(this);
+        schedule.runTaskTimer(this, 60L, 100L);
     }
 
     private void logAiStatus() {
@@ -204,6 +230,26 @@ public final class MerchantTalkPlugin extends JavaPlugin {
 
     public DialogueService dialogue() {
         return dialogue;
+    }
+
+    public CatalogService catalog() {
+        return catalog;
+    }
+
+    public CustomerService customers() {
+        return customers;
+    }
+
+    public PromoService promo() {
+        return promo;
+    }
+
+    public AnimationService animations() {
+        return animations;
+    }
+
+    public ScheduleService schedule() {
+        return schedule;
     }
 
     public AiService ai() {

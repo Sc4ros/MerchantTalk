@@ -29,7 +29,9 @@ public final class ProximityTask extends BukkitRunnable {
     public void run() {
         long now = System.currentTimeMillis();
         for (Merchant m : plugin.store().data().merchants.values()) {
-            if (m.lines(Trigger.GREET).isEmpty() || m.greetRadius <= 0) {
+            boolean hasLines = !m.lines(Trigger.GREET).isEmpty() || !m.lines(Trigger.REGULAR).isEmpty()
+                    || !m.lines(Trigger.PROMO).isEmpty();
+            if (!hasLines || m.greetRadius <= 0 || plugin.schedule().isHidden(m) || plugin.schedule().isAsleep(m)) {
                 inside.remove(m.id);
                 continue;
             }
@@ -47,7 +49,15 @@ public final class ProximityTask extends BukkitRunnable {
                 Long last = lastGreet.get(key);
                 if (last != null && now - last < m.greetCooldownSeconds * 1000L) continue;
                 lastGreet.put(key, now);
-                plugin.dialogue().speak(m, p, Trigger.GREET);
+                // Promo en cours > habitué > salut normal.
+                Trigger t;
+                if (plugin.promo().active(m) && !m.lines(Trigger.PROMO).isEmpty()) t = Trigger.PROMO;
+                else if (plugin.customers().isRegular(m, p) && !m.lines(Trigger.REGULAR).isEmpty()) t = Trigger.REGULAR;
+                else t = Trigger.GREET;
+                if (plugin.dialogue().speak(m, p, t, false) == null && t != Trigger.GREET) {
+                    plugin.dialogue().speak(m, p, Trigger.GREET);
+                }
+                plugin.animations().bow(m);
             }
             inside.put(m.id, current);
         }
