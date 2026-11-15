@@ -28,6 +28,12 @@ public final class Merchant {
     public String permission = "";
     /** Particules au-dessus du PNJ quand il parle. */
     public boolean talkParticles = true;
+    /** Conversation libre avec l'IA (si elle est activée dans config.yml). */
+    public boolean aiEnabled = false;
+    /** Personnalité, histoire, façon de parler du marchand (envoyée à l'IA). */
+    public String aiPersonality = "";
+    /** Surnoms pour l'appeler dans le chat, séparés par des virgules (en plus de son nom affiché). */
+    public String aiNames = "";
     public StoredLocation location;
     public MerchantStats stats = new MerchantStats();
     public Map<Trigger, List<DialogueLine>> lines = new LinkedHashMap<>();

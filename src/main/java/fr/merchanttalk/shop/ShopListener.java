@@ -139,6 +139,7 @@ public final class ShopListener implements Listener {
         plugin.shop().end(id);
         plugin.dialogue().forget(id);
         plugin.proximity().forget(id);
+        plugin.ai().forget(id);
         lastClick.remove(id);
     }
 

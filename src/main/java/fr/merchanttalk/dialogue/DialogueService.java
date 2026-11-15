@@ -138,6 +138,12 @@ public final class DialogueService {
         if (origin != null && merchant.talkParticles) talkParticles(origin, seconds);
     }
 
+    /** Particules au-dessus du marchand pendant {@code seconds} secondes (réponses de l'IA). */
+    public void particlesFor(Merchant merchant, double seconds) {
+        Location origin = plugin.npcs().npcLocation(merchant);
+        if (origin != null && merchant.talkParticles) talkParticles(origin, seconds);
+    }
+
     private void cancelPending(String key) {
         List<BukkitTask> tasks = pending.remove(key);
         if (tasks != null) tasks.forEach(BukkitTask::cancel);

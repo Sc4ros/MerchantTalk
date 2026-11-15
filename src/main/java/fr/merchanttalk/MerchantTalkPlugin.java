@@ -1,6 +1,8 @@
 package fr.merchanttalk;
 
 import com.google.gson.Gson;
+import fr.merchanttalk.ai.AiChatListener;
+import fr.merchanttalk.ai.AiService;
 import fr.merchanttalk.command.MerchantTalkCommand;
 import fr.merchanttalk.dialogue.DialogueService;
 import fr.merchanttalk.dialogue.ProximityTask;
@@ -34,6 +36,7 @@ public final class MerchantTalkPlugin extends JavaPlugin {
     private ProximityTask proximity;
     private ResourcePackService pack;
     private WebServer web;
+    private AiService ai;
     /** Sessions du site (jeton -> expiration), conservées lors d'un /mt reload. */
     private final java.util.Map<String, Long> webSessions = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -58,12 +61,14 @@ public final class MerchantTalkPlugin extends JavaPlugin {
         shop = new ShopService(this);
         commandBlocker = new CommandBlocker(this);
         pack = new ResourcePackService(this);
+        ai = new AiService(this);
         pack.buildNow();
 
         var pm = getServer().getPluginManager();
         pm.registerEvents(new ShopListener(this), this);
         pm.registerEvents(commandBlocker, this);
         pm.registerEvents(pack, this);
+        pm.registerEvents(new AiChatListener(this), this);
 
         MerchantTalkCommand command = new MerchantTalkCommand(this);
         PluginCommand pc = getCommand("merchanttalk");
@@ -74,6 +79,7 @@ public final class MerchantTalkPlugin extends JavaPlugin {
 
         startProximity();
         startWeb();
+        logAiStatus();
         // Sauvegarde automatique des statistiques (toutes les minutes).
         Bukkit.getScheduler().runTaskTimer(this, () -> store.saveIfDirty(), 1200L, 1200L);
 
@@ -104,6 +110,13 @@ public final class MerchantTalkPlugin extends JavaPlugin {
         pack.rebuild(true);
         startProximity();
         startWeb();
+        logAiStatus();
+    }
+
+    private void logAiStatus() {
+        if (!ai.enabled()) return;
+        if (ai.hasKey()) getLogger().info("IA activée : " + ai.provider() + " (modèle " + ai.model() + ").");
+        else getLogger().warning("IA activée mais aucune clé API (ai.api-key) dans config.yml : les marchands ne répondront pas.");
     }
 
     private void startProximity() {
@@ -191,6 +204,10 @@ public final class MerchantTalkPlugin extends JavaPlugin {
 
     public DialogueService dialogue() {
         return dialogue;
+    }
+
+    public AiService ai() {
+        return ai;
     }
 
     public ShopService shop() {

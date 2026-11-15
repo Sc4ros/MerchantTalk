@@ -64,6 +64,10 @@ final class ApiHandler {
                     testSpeak(ex, id);
                     return;
                 }
+                case "ai-test" -> {
+                    aiTest(ex, id);
+                    return;
+                }
                 case "duplicate" -> {
                     duplicate(ex, id);
                     return;
@@ -204,6 +208,15 @@ final class ApiHandler {
         o.add("pack", pack);
         o.addProperty("npcReady", plugin.npcs().isReady());
 
+        JsonObject ai = new JsonObject();
+        ai.addProperty("enabled", plugin.ai().enabled());
+        ai.addProperty("hasKey", plugin.ai().hasKey());
+        ai.addProperty("provider", plugin.ai().provider());
+        ai.addProperty("model", plugin.ai().model());
+        ai.addProperty("radius", plugin.getConfig().getDouble("ai.talk-radius", 8));
+        ai.addProperty("requireMention", plugin.getConfig().getBoolean("ai.require-mention", true));
+        o.add("ai", ai);
+
         JsonArray players = new JsonArray();
         for (org.bukkit.entity.Player p : plugin.getServer().getOnlinePlayers()) players.add(p.getName());
         o.add("players", players);
@@ -264,6 +277,48 @@ final class ApiHandler {
             o.addProperty("text", said.text);
             return o;
         });
+        WebServer.sendJson(ex, 200, res);
+    }
+
+    /** Discussion de test avec l'IA depuis le site : {message, history:[{role,text}]} → {reply}. */
+    private void aiTest(HttpExchange ex, String id) throws Exception {
+        JsonObject body = WebServer.readJson(ex);
+        String message = limit(str(body, "message").trim(), 300);
+        if (message.isEmpty()) throw new ApiException(400, "Écris un message.");
+        if (!plugin.ai().hasKey()) throw new ApiException(400, "Aucune clé API : renseigne ai.api-key dans config.yml puis fais /mt reload.");
+        java.util.List<fr.merchanttalk.ai.AiService.Msg> messages = new java.util.ArrayList<>();
+        if (body.has("history") && body.get("history").isJsonArray()) {
+            for (var e : body.getAsJsonArray("history")) {
+                if (!e.isJsonObject()) continue;
+                JsonObject h = e.getAsJsonObject();
+                String role = "assistant".equals(str(h, "role")) ? "assistant" : "user";
+                messages.add(new fr.merchanttalk.ai.AiService.Msg(role, limit(str(h, "text"), 500)));
+            }
+            while (messages.size() > 12) messages.removeFirst();
+        }
+        messages.add(new fr.merchanttalk.ai.AiService.Msg("user", message));
+        String system = plugin.sync(() -> {
+            Merchant m = requireMerchant(id);
+            org.bukkit.Location loc = plugin.npcs().npcLocation(m);
+            org.bukkit.World world = loc != null ? loc.getWorld() : plugin.getServer().getWorlds().getFirst();
+            return plugin.ai().systemPrompt(m, "Testeur", world);
+        });
+        String reply;
+        try {
+            reply = plugin.ai().request(system, messages).get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw new ApiException(502, "L'IA a répondu une erreur : " + (e.getCause() == null ? e.getMessage() : e.getCause().getMessage()));
+        } catch (java.util.concurrent.TimeoutException e) {
+            throw new ApiException(504, "L'IA met trop de temps à répondre.");
+        }
+        if (reply == null || reply.isBlank()) throw new ApiException(502, "L'IA n'a rien répondu (filtre de sécurité ou limite atteinte ?).");
+        Merchant m = plugin.sync(() -> requireMerchant(id));
+        String clean = plugin.ai().cleanReply(reply, m);
+        JsonObject res = new JsonObject();
+        res.addProperty("reply", clean);
+        String html = plugin.sync(() -> HtmlRenderer.render(plugin.dialogue().format(m.displayName == null ? m.id : m.displayName, "Testeur",
+                net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().escapeTags(clean))));
+        res.addProperty("html", html);
         WebServer.sendJson(ex, 200, res);
     }
 
@@ -343,6 +398,9 @@ final class ApiHandler {
             if (body.has("slimSkin")) m.slimSkin = body.get("slimSkin").getAsBoolean();
             if (body.has("lookAtPlayer")) m.lookAtPlayer = body.get("lookAtPlayer").getAsBoolean();
             if (body.has("talkParticles")) m.talkParticles = body.get("talkParticles").getAsBoolean();
+            if (body.has("aiEnabled")) m.aiEnabled = body.get("aiEnabled").getAsBoolean();
+            if (body.has("aiPersonality")) m.aiPersonality = limit(str(body, "aiPersonality"), 4000);
+            if (body.has("aiNames")) m.aiNames = limit(str(body, "aiNames"), 200);
             if (body.has("permission")) m.permission = limit(str(body, "permission").trim().replace(" ", ""), 100);
             if (body.has("greetRadius")) m.greetRadius = clamp(body.get("greetRadius").getAsDouble(), 0, 32);
             if (body.has("greetCooldownSeconds")) {
@@ -388,6 +446,7 @@ final class ApiHandler {
             plugin.shop().closeFor(id);
             plugin.npcs().remove(m);
             plugin.store().data().merchants.remove(id);
+            plugin.ai().forgetMerchant(id);
             plugin.store().save();
             return m.skinFile;
         });
