@@ -1,0 +1,98 @@
+# ==========================================================
+#                     MerchantTalk
+#   PNJ marchands qui parlent, porte d'entrée du shop
+#   EconomyShopGUI. La configuration des PNJ, des phrases
+#   et des voix se fait depuis l'interface web.
+# ==========================================================
+
+web:
+  enabled: true
+  # Adresse d'écoute. 0.0.0.0 = toutes les interfaces.
+  bind: 0.0.0.0
+  # Port du site. Sur Minestrator, ajoute ce port dans les "ports supplémentaires"
+  # du panel et mets ici le numéro qu'il t'a attribué.
+  port: 8085
+  # Adresse publique du site, telle que les JOUEURS peuvent l'atteindre.
+  # Elle sert à télécharger le resource pack. Exemple : http://123.45.67.89:8085
+  public-url: "http://127.0.0.1:8085"
+  # Mot de passe du site. S'il est vide, un mot de passe est généré au premier démarrage
+  # et affiché dans la console.
+  password: ""
+  # Durée de validité d'une connexion au site (en heures).
+  session-hours: 12
+
+resource-pack:
+  enabled: true
+  # true = le joueur doit accepter le pack, sinon il est expulsé.
+  required: true
+  prompt: "<gold>Ce serveur utilise des voix pour ses marchands. Accepte le pack pour les entendre !"
+  kick-message: "<red>Tu dois accepter le resource pack du serveur pour jouer."
+  # Renvoie automatiquement le pack aux joueurs connectés quand une voix est ajoutée/supprimée.
+  resend-on-change: true
+  # Formats de pack acceptés (min_format / max_format du pack.mcmeta).
+  min-format: 69
+  max-format: 999
+  description: "Voix des marchands (MerchantTalk)"
+
+shop:
+  # Commandes lancées par la CONSOLE pour ouvrir le shop au joueur.
+  # {player} = pseudo du joueur, {section} = section EconomyShopGUI du PNJ.
+  open-command-section: "shop {section} {player}"
+  open-command-main: "shop {player}"
+  # Bloque les commandes d'EconomyShopGUI pour les joueurs (sauf permission merchanttalk.bypass).
+  block-commands: true
+  # Bloque aussi automatiquement TOUTES les commandes déclarées par EconomyShopGUI.
+  block-all-economyshopgui-commands: true
+  # Commandes bloquées en plus (sans le /).
+  blocked-commands:
+    - shop
+    - sellall
+    - sellgui
+    - sell
+  # Annule toute transaction faite en dehors d'un PNJ (sécurité supplémentaire).
+  block-transactions-outside-npc: true
+
+dialogue:
+  # Format du message dans le chat. Tags : <npc> (nom du PNJ), <text> (la phrase), <player>.
+  chat-format: "<npc> <dark_gray>»</dark_gray> <white><text>"
+  # Temps minimum entre deux phrases d'achat/vente pour un même joueur (millisecondes).
+  min-interval-ms: 1200
+  # Quand le marchand parle déjà et qu'une nouvelle réplique arrive (ex. le joueur ferme le shop
+  # pendant la réplique d'achat) :
+  #   false = il FINIT sa phrase puis enchaîne la suivante (recommandé)
+  #   true  = la nouvelle réplique coupe la voix en cours
+  interrupt: false
+  # Pause entre deux répliques enchaînées (millisecondes).
+  queue-gap-ms: 300
+  # Une réplique qui devrait attendre plus longtemps que ça est abandonnée (millisecondes).
+  max-queue-ms: 15000
+  # Volume des voix. 1.0 = normal.
+  volume: 1.0
+  # Distance (en blocs) à laquelle la voix n'est plus audible. Le son est spatialisé :
+  # il vient du PNJ et baisse avec la distance.
+  hearing-distance: 16
+  # Fréquence de vérification des joueurs qui s'approchent (en ticks, 20 = 1 seconde).
+  greet-check-ticks: 10
+  # Chaque réplique peut avoir une condition d'heure (matin, jour, soir, nuit) et de météo.
+  # true = si une réplique spéciale correspond au moment (ex. « Nuit » la nuit), le marchand
+  # la choisit en priorité plutôt qu'une réplique « Toujours ». false = tout est mélangé.
+  prefer-specific: true
+  # Plages horaires en HEURES DU JEU (6h = lever du soleil, 18h = coucher). "19-6" passe minuit.
+  # Les plages peuvent se chevaucher (ex. 18h est à la fois « jour » et « soir »).
+  time-periods:
+    morning: "5-9"
+    day: "6-19"
+    evening: "17-20"
+    night: "19-6"
+  # Particules au-dessus du PNJ pendant qu'il parle (désactivables aussi PNJ par PNJ sur le site).
+  particles:
+    enabled: true
+    # Type de particule Bukkit sans données : NOTE, HEART, HAPPY_VILLAGER, ENCHANT...
+    type: NOTE
+
+messages:
+  prefix: "<gold>[MerchantTalk]</gold> "
+  command-blocked: "<red>Le shop n'est accessible qu'auprès d'un marchand !"
+  transaction-blocked: "<red>Tu dois passer par un marchand pour acheter ou vendre."
+  # Si le marchand n'a pas de réplique « Joueur sans la permission requise ».
+  no-permission: "<red>Ce marchand refuse de commercer avec toi."

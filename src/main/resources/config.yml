@@ -57,6 +57,15 @@ dialogue:
   chat-format: "<npc> <dark_gray>»</dark_gray> <white><text>"
   # Temps minimum entre deux phrases d'achat/vente pour un même joueur (millisecondes).
   min-interval-ms: 1200
+  # Quand le marchand parle déjà et qu'une nouvelle réplique arrive (ex. le joueur ferme le shop
+  # pendant la réplique d'achat) :
+  #   false = il FINIT sa phrase puis enchaîne la suivante (recommandé)
+  #   true  = la nouvelle réplique coupe la voix en cours
+  interrupt: false
+  # Pause entre deux répliques enchaînées (millisecondes).
+  queue-gap-ms: 300
+  # Une réplique qui devrait attendre plus longtemps que ça est abandonnée (millisecondes).
+  max-queue-ms: 15000
   # Volume des voix. 1.0 = normal.
   volume: 1.0
   # Distance (en blocs) à laquelle la voix n'est plus audible. Le son est spatialisé :

@@ -9,7 +9,9 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.Particle;
 import org.bukkit.SoundCategory;
 import org.bukkit.entity.Player;
@@ -33,6 +35,8 @@ public final class DialogueService {
     /** Dernière réplique choisie par (marchand + déclencheur), pour éviter de répéter la même. */
     private final Map<String, DialogueLine> lastLine = new HashMap<>();
     private final WorldConditions conditions;
+    /** Répliques en attente (le marchand finit sa phrase avant de les dire). */
+    private final Map<String, List<BukkitTask>> pending = new HashMap<>();
 
     private record Speech(long at, long busyUntil, String soundKey) {
     }
@@ -71,43 +75,72 @@ public final class DialogueService {
         String key = merchant.id + ":" + player.getUniqueId();
         long now = System.currentTimeMillis();
         Speech previous = lastSpeech.get(key);
+        boolean busy = previous != null && now < previous.busyUntil();
         boolean repeatable = trigger == Trigger.BUY || trigger == Trigger.SELL;
-        if (repeatable && previous != null && !force) {
+        if (!force) {
+            // Achats/ventes à la chaîne ou salut : jamais mis en attente, simplement ignorés si le marchand parle déjà.
+            if ((repeatable || trigger == Trigger.GREET) && busy) return null;
             long minInterval = plugin.getConfig().getLong("dialogue.min-interval-ms", 1200);
-            // Achats/ventes à la chaîne : on ne coupe pas la voix en cours.
-            if (now < previous.busyUntil() || now - previous.at() < minInterval) return null;
+            if (repeatable && previous != null && now - previous.at() < minInterval) return null;
         }
 
         DialogueLine line = pick(merchant.id + ":" + trigger, candidates);
-        Location origin = npcLoc;
+        VoiceClip clip = plugin.store().sound(line.sound);
+        if (clip != null && !plugin.pack().hasSound(clip.id)) clip = null;
+        long duration = clip == null ? 0 : (long) (clip.duration * 1000);
+        String soundKey = clip == null ? null : clip.soundKey();
 
-        // Coupe la voix précédente du marchand si elle est encore en train d'être jouée.
-        if (previous != null && previous.soundKey() != null && now < previous.busyUntil() && origin != null) {
-            for (Player p : nearby(origin)) p.stopSound(previous.soundKey(), SoundCategory.VOICE);
+        boolean interrupt = force || plugin.getConfig().getBoolean("dialogue.interrupt", false);
+        if (busy && !interrupt) {
+            // Le marchand termine sa phrase, puis enchaîne celle-ci.
+            long startAt = previous.busyUntil() + plugin.getConfig().getLong("dialogue.queue-gap-ms", 300);
+            long delayMs = startAt - now;
+            if (delayMs > plugin.getConfig().getLong("dialogue.max-queue-ms", 15000)) return null; // file trop longue
+            lastSpeech.put(key, new Speech(now, startAt + duration, soundKey));
+            VoiceClip queuedClip = clip;
+            BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                pending.computeIfPresent(key, (k, list) -> {
+                    list.removeIf(t -> t.isCancelled() || !Bukkit.getScheduler().isQueued(t.getTaskId()));
+                    return list.isEmpty() ? null : list;
+                });
+                if (player.isOnline()) deliver(merchant, player, line, queuedClip);
+            }, Math.max(1L, (delayMs + 49) / 50));
+            pending.computeIfAbsent(key, k -> new ArrayList<>()).add(task);
+            return line;
         }
 
+        // Mode « couper » (ou test depuis le site) : on arrête la voix en cours.
+        if (busy && previous.soundKey() != null && npcLoc != null) {
+            for (Player p : nearby(npcLoc)) p.stopSound(previous.soundKey(), SoundCategory.VOICE);
+            cancelPending(key);
+        }
+        lastSpeech.put(key, new Speech(now, now + duration, soundKey));
+        deliver(merchant, player, line, clip);
+        return line;
+    }
+
+    /** Dit réellement la réplique : message dans le chat, voix depuis le PNJ et particules. */
+    private void deliver(Merchant merchant, Player player, DialogueLine line, VoiceClip clip) {
+        Location origin = plugin.npcs().npcLocation(merchant);
         if (line.text != null && !line.text.isBlank()) {
             player.sendMessage(format(merchant, player, line.text));
         }
-
-        String soundKey = null;
-        long busyUntil = now;
-        VoiceClip clip = plugin.store().sound(line.sound);
-        if (clip != null && origin != null && plugin.pack().hasSound(clip.id)) {
-            soundKey = clip.soundKey();
+        double seconds = 0.6;
+        if (clip != null && origin != null && origin.getWorld() != null) {
             float volume = (float) plugin.getConfig().getDouble("dialogue.volume", 1.0);
             // Le serveur n'envoie le son qu'aux joueurs à moins de 16 x volume blocs.
             float hearing = (float) plugin.getConfig().getDouble("dialogue.hearing-distance", 16);
             if (hearing > 16 && volume >= 1.0f) volume = Math.max(volume, hearing / 16f);
             Location at = origin.clone().add(0, 1.6, 0);
-            at.getWorld().playSound(at, soundKey, SoundCategory.VOICE, volume, 1.0f);
-            busyUntil = now + (long) (clip.duration * 1000);
+            at.getWorld().playSound(at, clip.soundKey(), SoundCategory.VOICE, volume, 1.0f);
+            seconds = Math.max(seconds, clip.duration);
         }
-        lastSpeech.put(key, new Speech(now, busyUntil, soundKey));
-        if (origin != null && merchant.talkParticles) {
-            talkParticles(origin, Math.max(0.6, (busyUntil - now) / 1000.0));
-        }
-        return line;
+        if (origin != null && merchant.talkParticles) talkParticles(origin, seconds);
+    }
+
+    private void cancelPending(String key) {
+        List<BukkitTask> tasks = pending.remove(key);
+        if (tasks != null) tasks.forEach(BukkitTask::cancel);
     }
 
     /** Petites notes au-dessus de la tête du PNJ pendant qu'il parle. */
@@ -154,6 +187,9 @@ public final class DialogueService {
     public void forget(UUID player) {
         String suffix = ":" + player;
         lastSpeech.keySet().removeIf(k -> k.endsWith(suffix));
+        for (String key : List.copyOf(pending.keySet())) {
+            if (key.endsWith(suffix)) cancelPending(key);
+        }
     }
 
     private DialogueLine pick(String key, List<DialogueLine> candidates) {

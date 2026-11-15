@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MerchantTalk</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Connexion -->
+  <section id="login" class="login hidden">
+    <form id="login-form" class="card login-card">
+      <div class="brand"><span class="logo">💬</span> MerchantTalk</div>
+      <p class="muted">Entre le mot de passe de l'interface (dans <code>plugins/MerchantTalk/config.yml</code>).</p>
+      <input id="login-password" type="password" placeholder="Mot de passe" autocomplete="current-password" required>
+      <button class="btn primary" type="submit">Se connecter</button>
+      <p id="login-error" class="error"></p>
+    </form>
+  </section>
+
+  <!-- Application -->
+  <section id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand"><span class="logo">💬</span> MerchantTalk</div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="merchants">Marchands</button>
+        <button class="tab" data-tab="voices">Voix</button>
+      </nav>
+      <div class="topbar-right">
+        <span id="pack-status" class="pill"></span>
+        <button id="logout" class="btn ghost small">Déconnexion</button>
+      </div>
+    </header>
+
+    <!-- Onglet marchands -->
+    <main id="tab-merchants" class="layout">
+      <aside class="sidebar card">
+        <div class="sidebar-head">
+          <h2>Marchands</h2>
+          <button id="new-merchant" class="btn primary small">+ Nouveau</button>
+        </div>
+        <input id="merchant-search" class="search" type="text" placeholder="Rechercher…">
+        <div id="new-form" class="new-form hidden">
+          <input id="new-id" type="text" placeholder="identifiant (ex : forgeron)" maxlength="32">
+          <input id="new-name" type="text" placeholder="Nom affiché (ex : <gold>Bjorn)" maxlength="200">
+          <div class="mm-preview" id="new-name-preview"></div>
+          <div class="row-gap">
+            <button id="new-cancel" class="btn ghost small">Annuler</button>
+            <button id="new-create" class="btn primary small">Créer</button>
+          </div>
+        </div>
+        <ul id="merchant-list" class="merchant-list"></ul>
+      </aside>
+
+      <section id="editor" class="editor">
+        <div class="card empty-state" id="editor-empty">
+          <h2>Aucun marchand sélectionné</h2>
+          <p class="muted">Crée un marchand avec « + Nouveau » ou en jeu avec <code>/mt create &lt;id&gt;</code>,
+            puis place-le avec <code>/mt place &lt;id&gt;</code>.</p>
+        </div>
+        <div id="editor-content" class="hidden"></div>
+      </section>
+    </main>
+
+    <!-- Onglet voix -->
+    <main id="tab-voices" class="voices hidden">
+      <div class="card">
+        <h2>Ajouter des voix</h2>
+        <p class="muted">MP3, WAV, OGG, M4A… Les fichiers sont convertis dans ton navigateur en <b>OGG mono</b> :
+          c'est obligatoire pour que le son vienne du PNJ (spatialisé) et baisse avec la distance.</p>
+        <label id="dropzone" class="dropzone">
+          <input id="voice-input" type="file" accept="audio/*,.ogg,.mp3,.wav,.m4a,.flac" multiple hidden>
+          <span class="drop-icon">🎙️</span>
+          <span><b>Clique</b> ou <b>glisse</b> tes fichiers audio ici</span>
+        </label>
+        <div class="record-row">
+          <button id="record-btn" class="btn ghost">⏺ Enregistrer au micro</button>
+          <span id="record-status" class="muted"></span>
+        </div>
+        <div class="options-row">
+          <label class="check"><input id="opt-trim" type="checkbox" checked> Couper les silences au début et à la fin</label>
+          <label class="check"><input id="opt-normalize" type="checkbox" checked> Égaliser le volume (toutes les voix au même niveau)</label>
+        </div>
+        <ul id="upload-queue" class="upload-queue"></ul>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h2>Bibliothèque</h2>
+          <span id="voice-count" class="muted"></span>
+        </div>
+        <table class="voice-table">
+          <thead><tr><th></th><th>Nom</th><th>Forme d'onde</th><th>Durée</th><th>Utilisée par</th><th></th></tr></thead>
+          <tbody id="voice-list"></tbody>
+        </table>
+        <p id="voice-empty" class="muted hidden">Aucune voix pour le moment.</p>
+      </div>
+    </main>
+  </section>
+
+  <div id="toast" class="toast"></div>
+
+  <template id="tpl-line">
+    <div class="line">
+      <input class="line-text" type="text" maxlength="500" placeholder="Texte dans le chat (optionnel). Ex : Bienvenue {player} !">
+      <select class="line-sound"></select>
+      <select class="line-time" title="Moment de la journée en jeu"></select>
+      <select class="line-weather" title="Météo en jeu"></select>
+      <button class="btn icon play" title="Écouter la voix">▶</button>
+      <button class="btn icon danger remove" title="Supprimer">✕</button>
+      <div class="line-preview chat"></div>
+    </div>
+  </template>
+
+  <script src="vendor/WasmMediaEncoder.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
